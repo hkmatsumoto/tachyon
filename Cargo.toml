@@ -8,3 +8,7 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+llvm-sys = "140.0.2"
+
+[package.metadata.rust-analyzer]
+rustc_private = true
