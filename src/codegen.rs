@@ -12,6 +12,7 @@ use std::{cell::OnceCell, ffi::CString};
 
 use crate::{ty::fn_sig_to_llvm_fn_type, FunctionCx, TPlace};
 
+#[macro_export]
 macro_rules! c_string {
     ($string:expr) => {
         CString::new($string).unwrap()
@@ -40,7 +41,6 @@ pub unsafe fn codegen_fn<'tcx>(
 
 impl<'tcx> FunctionCx<'tcx> {
     unsafe fn codegen_header(&mut self) {
-        dbg!(&self.mir.var_debug_info);
         for _ in &self.mir.local_decls {
             self.locals.push(TPlace {
                 llval: OnceCell::new(),

@@ -10,5 +10,8 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 llvm-sys = "140.0.2"
 
+[dev-dependencies]
+compiletest_rs = { version = "0.8.0", features = ["tmp", "rustc"] }
+
 [package.metadata.rust-analyzer]
 rustc_private = true
