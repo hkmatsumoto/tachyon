@@ -1,6 +1,8 @@
 #![feature(rustc_private)]
 #![feature(once_cell)]
+#![feature(box_patterns)]
 
+extern crate rustc_const_eval;
 extern crate rustc_hir;
 extern crate rustc_index;
 extern crate rustc_middle;
@@ -10,7 +12,7 @@ use std::cell::OnceCell;
 use rustc_index::vec::IndexVec;
 use rustc_middle::{
     mir,
-    ty::{Ty, TyCtxt},
+    ty::{layout::TyAndLayout, TyCtxt},
 };
 
 use llvm_sys::{core::*, prelude::*};
@@ -18,7 +20,9 @@ use llvm_sys::{core::*, prelude::*};
 pub mod codegen;
 pub(crate) mod ty;
 
-pub(crate) struct TPlace {
+#[derive(Debug)]
+pub(crate) struct TPlace<'tcx> {
+    ty_and_layout: TyAndLayout<'tcx>,
     llval: OnceCell<LLVMValueRef>,
 }
 
@@ -31,7 +35,7 @@ pub(crate) struct FunctionCx<'tcx> {
     pub(crate) tcx: TyCtxt<'tcx>,
     pub(crate) mir: &'tcx mir::Body<'tcx>,
 
-    pub(crate) locals: IndexVec<mir::Local, TPlace>,
+    pub(crate) locals: IndexVec<mir::Local, TPlace<'tcx>>,
     pub(crate) basic_blocks: IndexVec<mir::BasicBlock, LLVMBasicBlockRef>,
 }
 

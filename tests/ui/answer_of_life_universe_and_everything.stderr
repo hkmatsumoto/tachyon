@@ -1,0 +1,13 @@
+; ModuleID = 'top'
+source_filename = "top"
+
+define i32 @answer_to_life_universe_and_everything() {
+entry:
+  %_0 = alloca i32, align 4
+  br label %bb0
+
+bb0:                                              ; preds = %entry
+  store i32 42, i32* %_0, align 4
+  %0 = load i32, i32* %_0, align 4
+  ret i32 %0
+}

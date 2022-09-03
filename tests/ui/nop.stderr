@@ -1,0 +1,10 @@
+; ModuleID = 'top'
+source_filename = "top"
+
+define void @nop() {
+entry:
+  br label %bb0
+
+bb0:                                              ; preds = %entry
+  ret void
+}
