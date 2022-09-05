@@ -4,7 +4,7 @@ use llvm_sys::{core::*, prelude::*};
 
 pub(crate) unsafe fn ty_to_llvm_type<'tcx>(llcx: LLVMContextRef, ty: Ty<'tcx>) -> LLVMTypeRef {
     match ty.kind() {
-        TyKind::Bool => todo!(),
+        TyKind::Bool => LLVMInt1TypeInContext(llcx),
         TyKind::Char => LLVMInt32TypeInContext(llcx),
         TyKind::Int(int) => match int {
             IntTy::Isize => todo!(),

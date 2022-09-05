@@ -253,7 +253,7 @@ impl<'tcx> FunctionCx<'tcx> {
                         ConstValue::Scalar(rustc_const_eval::interpret::Scalar::Int(int)) => {
                             let val = int.to_bits(int.size()).unwrap() as u64;
                             let int_type = match int.size().bits() {
-                                1 => LLVMInt1TypeInContext(self.llcx),
+                                8 if ty.is_bool() => LLVMInt1TypeInContext(self.llcx),
                                 8 => LLVMInt8TypeInContext(self.llcx),
                                 16 => LLVMInt16TypeInContext(self.llcx),
                                 32 => LLVMInt32TypeInContext(self.llcx),
