@@ -11,8 +11,8 @@ use rustc_middle::{
 use llvm_sys::{
     core::*,
     execution_engine::{
-        LLVMCreateExecutionEngineForModule, LLVMDisposeExecutionEngine, LLVMExecutionEngineRef,
-        LLVMGetFunctionAddress, LLVMLinkInMCJIT,
+        LLVMCreateExecutionEngineForModule, LLVMExecutionEngineRef, LLVMGetFunctionAddress,
+        LLVMLinkInMCJIT,
     },
     prelude::*,
     target::{LLVM_InitializeNativeAsmPrinter, LLVM_InitializeNativeTarget},
@@ -87,7 +87,7 @@ pub unsafe fn execute_fn<'tcx>(ee: LLVMExecutionEngineRef, fn_name: CString) {
 
 impl<'tcx> FunctionCx<'tcx> {
     unsafe fn codegen_header(&mut self) {
-        for (local, local_decl) in self.mir.local_decls.iter_enumerated() {
+        for local_decl in self.mir.local_decls.iter() {
             self.locals.push(TPlace {
                 ty_and_layout: self
                     .tcx
@@ -106,7 +106,7 @@ impl<'tcx> FunctionCx<'tcx> {
         }
 
         LLVMAppendBasicBlockInContext(self.llcx, self.llfn, c_string!("entry").as_ptr());
-        for (bb, _) in traversal::reverse_postorder(&self.mir) {
+        for (bb, _) in traversal::reverse_postorder(self.mir) {
             let block = LLVMAppendBasicBlockInContext(
                 self.llcx,
                 self.llfn,
@@ -147,7 +147,7 @@ impl<'tcx> FunctionCx<'tcx> {
     }
 
     unsafe fn codegen_body(&mut self) {
-        for (bb, data) in traversal::reverse_postorder(&self.mir) {
+        for (bb, data) in traversal::reverse_postorder(self.mir) {
             LLVMPositionBuilderAtEnd(self.llbx, self.basic_blocks[bb]);
 
             for stmt in &data.statements {
@@ -170,7 +170,7 @@ impl<'tcx> FunctionCx<'tcx> {
                     }
                     Rvalue::BinaryOp(bin_op, box (lhs, rhs)) => {
                         let lhs_ty = lhs.ty(&self.mir.local_decls, self.tcx);
-                        let rhs_ty = rhs.ty(&self.mir.local_decls, self.tcx);
+                        let _rhs_ty = rhs.ty(&self.mir.local_decls, self.tcx);
                         let lhs_val = *self.codegen_operand(lhs).load_scalar(self.llbx).llval();
                         let rhs_val = *self.codegen_operand(rhs).load_scalar(self.llbx).llval();
 

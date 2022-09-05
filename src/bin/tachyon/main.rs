@@ -3,8 +3,6 @@
 extern crate rustc_driver;
 extern crate rustc_interface;
 
-use std::{fs::OpenOptions, io::Write, path::PathBuf, process::Command};
-
 use rustc_driver::Callbacks;
 
 pub mod backend;
