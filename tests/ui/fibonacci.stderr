@@ -1,0 +1,63 @@
+; ModuleID = 'top'
+source_filename = "top"
+
+define i32 @fibonacci(i32 %n) {
+entry:
+  %_0 = alloca i32, align 4
+  %_2 = alloca i32, align 4
+  %_3 = alloca i32, align 4
+  %_4 = alloca i32, align 4
+  %_5 = alloca i32, align 4
+  %_6 = alloca i32, align 4
+  %_7 = alloca i32, align 4
+  %_8 = alloca i32, align 4
+  br label %bb0
+
+bb0:                                              ; preds = %entry
+  switch i32 %n, label %bb1 [
+    i32 0, label %bb4
+    i32 1, label %bb5
+  ]
+
+bb1:                                              ; preds = %bb0
+  store i32 %n, i32* %_2, align 4
+  %0 = load i32, i32* %_2, align 4
+  store i32 %0, i32* %_5, align 4
+  %1 = load i32, i32* %_5, align 4
+  %2 = sub i32 %1, 1
+  store i32 %2, i32* %_4, align 4
+  %3 = load i32, i32* %_4, align 4
+  %4 = call i32 @fibonacci(i32 %3)
+  store i32 %4, i32* %_3, align 4
+  br label %bb3
+
+bb4:                                              ; preds = %bb0
+  store i32 0, i32* %_0, align 4
+  br label %bb6
+
+bb5:                                              ; preds = %bb0
+  store i32 1, i32* %_0, align 4
+  br label %bb6
+
+bb3:                                              ; preds = %bb1
+  %5 = load i32, i32* %_2, align 4
+  store i32 %5, i32* %_8, align 4
+  %6 = load i32, i32* %_8, align 4
+  %7 = sub i32 %6, 2
+  store i32 %7, i32* %_7, align 4
+  %8 = load i32, i32* %_7, align 4
+  %9 = call i32 @fibonacci(i32 %8)
+  store i32 %9, i32* %_6, align 4
+  br label %bb2
+
+bb2:                                              ; preds = %bb3
+  %10 = load i32, i32* %_3, align 4
+  %11 = load i32, i32* %_6, align 4
+  %12 = add i32 %10, %11
+  store i32 %12, i32* %_0, align 4
+  br label %bb6
+
+bb6:                                              ; preds = %bb4, %bb5, %bb2
+  %13 = load i32, i32* %_0, align 4
+  ret i32 %13
+}

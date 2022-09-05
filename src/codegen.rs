@@ -39,7 +39,7 @@ pub unsafe fn codegen_fn<'tcx>(
     llmod: LLVMModuleRef,
     tcx: TyCtxt<'tcx>,
     fn_id: DefId,
-) {
+) -> LLVMValueRef {
     let fn_sig = tcx.fn_sig(fn_id).no_bound_vars().unwrap();
     let llfn_sig = fn_sig_to_llvm_fn_type(llcx, fn_sig);
 
@@ -52,6 +52,8 @@ pub unsafe fn codegen_fn<'tcx>(
     let mut fx = FunctionCx::new(llcx, llmod, llfn, tcx, mir);
     fx.codegen_header();
     fx.codegen_body();
+
+    llfn
 }
 
 impl<'tcx> FunctionCx<'tcx> {
@@ -250,11 +252,7 @@ impl<'tcx> FunctionCx<'tcx> {
             TerminatorKind::Goto { target } => {
                 LLVMBuildBr(self.llbx, self.basic_blocks[*target]);
             }
-            TerminatorKind::SwitchInt {
-                discr,
-                targets,
-                ..
-            } => {
+            TerminatorKind::SwitchInt { discr, targets, .. } => {
                 let operand = self.codegen_operand(discr).load_scalar(self.llbx);
                 let switch = LLVMBuildSwitch(
                     self.llbx,
@@ -280,6 +278,44 @@ impl<'tcx> FunctionCx<'tcx> {
                         LLVMBuildRet(self.llbx, ret)
                     }
                 };
+            }
+            TerminatorKind::Call {
+                func,
+                args,
+                destination,
+                target,
+                ..
+            } => {
+                let (func_id, _) = func.const_fn_def().unwrap();
+                let fn_name = self.tcx.def_path_str(func_id);
+
+                let func = LLVMGetNamedFunction(self.llmod, c_string!(fn_name).as_ptr());
+                let func = if func.is_null() {
+                    codegen_fn(self.llcx, self.llmod, self.tcx, func_id)
+                } else {
+                    func
+                };
+
+                let func_type = LLVMTypeOf(func);
+                let ret_type = LLVMGetReturnType(func_type);
+                let mut args = args
+                    .iter()
+                    .map(|arg| *self.codegen_operand(arg).load_scalar(self.llbx).llval())
+                    .collect::<Vec<_>>();
+                let ret = LLVMBuildCall2(
+                    self.llbx,
+                    ret_type,
+                    func,
+                    args.as_mut_ptr(),
+                    args.len() as u32,
+                    c_string!("").as_ptr(),
+                );
+
+                let ptr = self.locals[destination.local].llval();
+                LLVMBuildStore(self.llbx, ret, *ptr);
+                if let Some(target) = target {
+                    LLVMBuildBr(self.llbx, self.basic_blocks[*target]);
+                }
             }
             _ => {
                 todo!()
