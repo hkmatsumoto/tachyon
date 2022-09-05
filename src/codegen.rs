@@ -58,7 +58,6 @@ impl<'tcx> FunctionCx<'tcx> {
     unsafe fn codegen_header(&mut self) {
         for (local, local_decl) in self.mir.local_decls.iter_enumerated() {
             self.locals.push(TPlace {
-                local,
                 ty_and_layout: self
                     .tcx
                     .layout_of(ParamEnv::reveal_all().and(local_decl.ty))
@@ -134,20 +133,15 @@ impl<'tcx> FunctionCx<'tcx> {
                 let name = c_string!("");
                 match rvalue {
                     Rvalue::Use(operand) => {
-                        self.codegen_operand(place.local, operand)
+                        self.codegen_operand(operand)
+                            .load_scalar(self.llbx)
                             .store(self.llbx, *self.locals[place.local].llval());
                     }
                     Rvalue::BinaryOp(bin_op, box (lhs, rhs)) => {
                         let lhs_ty = lhs.ty(&self.mir.local_decls, self.tcx);
                         let rhs_ty = rhs.ty(&self.mir.local_decls, self.tcx);
-                        let lhs_val = *self
-                            .codegen_operand(place.local, lhs)
-                            .load_scalar(self.llbx)
-                            .llval();
-                        let rhs_val = *self
-                            .codegen_operand(place.local, rhs)
-                            .load_scalar(self.llbx)
-                            .llval();
+                        let lhs_val = *self.codegen_operand(lhs).load_scalar(self.llbx).llval();
+                        let rhs_val = *self.codegen_operand(rhs).load_scalar(self.llbx).llval();
 
                         let tmp = match bin_op {
                             BinOp::Add if lhs_ty.is_integral() => {
@@ -198,8 +192,7 @@ impl<'tcx> FunctionCx<'tcx> {
                             _ => todo!(),
                         };
 
-                        let _ = self.locals[place.local].llval.take();
-                        self.locals[place.local].llval.set(tmp).unwrap();
+                        LLVMBuildStore(self.llbx, tmp, *self.locals[place.local].llval());
                     }
                     _ => todo!(),
                 }
@@ -208,17 +201,22 @@ impl<'tcx> FunctionCx<'tcx> {
         }
     }
 
-    unsafe fn codegen_operand(
-        &mut self,
-        local: mir::Local,
-        operand: &Operand<'tcx>,
-    ) -> TPlace<'tcx> {
-        let ty_and_layout = self.locals[local].ty_and_layout;
-        let llval = match operand {
+    unsafe fn codegen_operand(&mut self, operand: &Operand<'tcx>) -> TPlace<'tcx> {
+        match operand {
             mir::Operand::Copy(place) | mir::Operand::Move(place) => {
-                self.locals[place.local].llval.clone()
+                let layout = self.locals[place.local].ty_and_layout;
+                let llval = self.locals[place.local].llval.clone();
+
+                TPlace {
+                    ty_and_layout: layout,
+                    llval,
+                }
             }
             mir::Operand::Constant(constant) => {
+                let layout = self
+                    .tcx
+                    .layout_of(ParamEnv::reveal_all().and(constant.ty()))
+                    .unwrap();
                 let llval = match constant.literal {
                     mir::ConstantKind::Val(val, ty) => match val {
                         ConstValue::Scalar(rustc_const_eval::interpret::Scalar::Int(int)) => {
@@ -239,19 +237,40 @@ impl<'tcx> FunctionCx<'tcx> {
                     _ => todo!(),
                 };
 
-                OnceCell::from(llval)
+                TPlace {
+                    ty_and_layout: layout,
+                    llval: OnceCell::from(llval),
+                }
             }
-        };
-
-        TPlace {
-            local,
-            ty_and_layout,
-            llval,
         }
     }
 
     unsafe fn codegen_terminator(&mut self, term: &Terminator<'tcx>) {
         match &term.kind {
+            TerminatorKind::Goto { target } => {
+                LLVMBuildBr(self.llbx, self.basic_blocks[*target]);
+            }
+            TerminatorKind::SwitchInt {
+                discr,
+                targets,
+                ..
+            } => {
+                let operand = self.codegen_operand(discr).load_scalar(self.llbx);
+                let switch = LLVMBuildSwitch(
+                    self.llbx,
+                    *operand.llval(),
+                    self.basic_blocks[targets.otherwise()],
+                    targets.all_targets().len() as std::os::raw::c_uint,
+                );
+
+                for (value, target) in targets.iter() {
+                    LLVMAddCase(
+                        switch,
+                        LLVMConstInt(LLVMTypeOf(*operand.llval()), value as u64, 0),
+                        self.basic_blocks[target],
+                    );
+                }
+            }
             TerminatorKind::Return => {
                 let ret_data = &self.locals[mir::RETURN_PLACE];
                 match ret_data.ty().kind() {
@@ -271,7 +290,6 @@ impl<'tcx> FunctionCx<'tcx> {
 
 #[derive(Debug, Clone)]
 pub(crate) struct TPlace<'tcx> {
-    local: mir::Local,
     ty_and_layout: TyAndLayout<'tcx>,
     llval: OnceCell<LLVMValueRef>,
 }
@@ -296,7 +314,6 @@ impl<'tcx> TPlace<'tcx> {
             let llval = LLVMBuildLoad2(llbx, llval_element_type, *llval, c_string!("").as_ptr());
 
             return TPlace {
-                local: self.local,
                 ty_and_layout: self.ty_and_layout,
                 llval: OnceCell::from(llval),
             };
