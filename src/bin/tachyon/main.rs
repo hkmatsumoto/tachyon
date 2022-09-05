@@ -10,8 +10,12 @@ use rustc_driver::Callbacks;
 pub mod backend;
 pub mod shims;
 
-struct TachyonCallbacks;
-impl Callbacks for TachyonCallbacks {
+enum RunMode {
+    Compile,
+    Execute,
+}
+
+impl Callbacks for RunMode {
     fn after_analysis<'tcx>(
         &mut self,
         _compiler: &rustc_interface::interface::Compiler,
@@ -21,17 +25,26 @@ impl Callbacks for TachyonCallbacks {
             .global_ctxt()
             .unwrap()
             .peek_mut()
-            .enter(|tcx| shims::compile_testfile(tcx));
+            .enter(|tcx| match self {
+                RunMode::Compile => shims::compile(tcx),
+                RunMode::Execute => shims::execute(tcx),
+            });
 
         rustc_driver::Compilation::Stop
     }
 }
 
 fn main() {
-    let args = std::env::args().collect::<Vec<_>>();
+    let mut args = std::env::args().collect::<Vec<_>>();
 
-    let callbacks = &mut TachyonCallbacks;
-    let mut compiler = rustc_driver::RunCompiler::new(args.as_slice(), callbacks);
+    let mut callbacks = if args.get(1).map_or(false, |arg| arg == "--execute") {
+        args.remove(1);
+        RunMode::Execute
+    } else {
+        RunMode::Compile
+    };
+
+    let mut compiler = rustc_driver::RunCompiler::new(args.as_slice(), &mut callbacks);
     compiler.set_make_codegen_backend(Some(Box::new(|_| Box::new(backend::DummyBackend))));
     compiler.run().unwrap();
 }

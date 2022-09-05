@@ -10,9 +10,12 @@ use rustc_middle::{
 
 use llvm_sys::{
     core::*,
-    execution_engine::{LLVMCreateExecutionEngineForModule, LLVMLinkInMCJIT},
+    execution_engine::{
+        LLVMCreateExecutionEngineForModule, LLVMDisposeExecutionEngine, LLVMExecutionEngineRef,
+        LLVMGetFunctionAddress, LLVMLinkInMCJIT,
+    },
     prelude::*,
-    target::LLVM_InitializeNativeTarget,
+    target::{LLVM_InitializeNativeAsmPrinter, LLVM_InitializeNativeTarget},
     transforms::scalar::LLVMAddScalarReplAggregatesPass,
     LLVMTypeKind,
 };
@@ -54,6 +57,32 @@ pub unsafe fn codegen_fn<'tcx>(
     fx.codegen_body();
 
     llfn
+}
+
+pub unsafe fn optimize_fn<'tcx>(llmod: LLVMModuleRef) -> LLVMExecutionEngineRef {
+    let mut ee = std::mem::MaybeUninit::uninit();
+    let mut out = std::mem::MaybeUninit::zeroed();
+
+    LLVMLinkInMCJIT();
+    LLVM_InitializeNativeTarget();
+    LLVM_InitializeNativeAsmPrinter();
+
+    LLVMCreateExecutionEngineForModule(ee.as_mut_ptr(), llmod, out.as_mut_ptr());
+
+    let pm = LLVMCreatePassManager();
+    LLVMAddScalarReplAggregatesPass(pm);
+
+    LLVMRunPassManager(pm, llmod);
+
+    ee.assume_init()
+}
+
+pub unsafe fn execute_fn<'tcx>(ee: LLVMExecutionEngineRef, fn_name: CString) {
+    let addr = LLVMGetFunctionAddress(ee, fn_name.as_ptr());
+
+    let f: extern "C" fn(()) -> () = std::mem::transmute(addr);
+    let ret = f(());
+    dbg!(ret);
 }
 
 impl<'tcx> FunctionCx<'tcx> {
