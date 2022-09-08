@@ -19,6 +19,7 @@ use llvm_sys::{
     transforms::scalar::LLVMAddScalarReplAggregatesPass,
     LLVMTypeKind,
 };
+use tracing::{debug, instrument, warn};
 
 use std::{cell::OnceCell, ffi::CString};
 
@@ -37,6 +38,7 @@ macro_rules! c_string {
     };
 }
 
+#[instrument(skip(llcx, llmod, tcx, fn_id), fields(fn_name=?tcx.def_path_str(fn_id)))]
 pub unsafe fn codegen_fn<'tcx>(
     llcx: LLVMContextRef,
     llmod: LLVMModuleRef,
@@ -148,6 +150,7 @@ impl<'tcx> FunctionCx<'tcx> {
 
     unsafe fn codegen_body(&mut self) {
         for (bb, data) in traversal::reverse_postorder(self.mir) {
+            debug!("entering bb{}", bb.index());
             LLVMPositionBuilderAtEnd(self.llbx, self.basic_blocks[bb]);
 
             for stmt in &data.statements {
@@ -159,6 +162,7 @@ impl<'tcx> FunctionCx<'tcx> {
     }
 
     unsafe fn codegen_statement(&mut self, stmt: &Statement<'tcx>) {
+        debug!(?stmt.kind);
         match &stmt.kind {
             StatementKind::Assign(box (place, rvalue)) => {
                 let name = c_string!("");
@@ -245,7 +249,9 @@ impl<'tcx> FunctionCx<'tcx> {
                     _ => todo!(),
                 }
             }
-            StatementKind::StorageLive(_) | StatementKind::StorageDead(_) => {}
+            StatementKind::StorageLive(_) | StatementKind::StorageDead(_) => {
+                warn!("codegen skipped for {:?}", stmt.kind);
+            }
             _ => todo!(),
         }
     }
@@ -295,6 +301,7 @@ impl<'tcx> FunctionCx<'tcx> {
     }
 
     unsafe fn codegen_terminator(&mut self, term: &Terminator<'tcx>) {
+        debug!(?term.kind);
         match &term.kind {
             TerminatorKind::Goto { target } => {
                 LLVMBuildBr(self.llbx, self.basic_blocks[*target]);
@@ -365,6 +372,7 @@ impl<'tcx> FunctionCx<'tcx> {
                 }
             }
             TerminatorKind::Assert { target, .. } => {
+                warn!("codegen does not fully support `{:?}`", term.kind);
                 LLVMBuildBr(self.llbx, self.basic_blocks[*target]);
             }
             _ => {

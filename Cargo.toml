@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 llvm-sys = "140.0.2"
+tracing = "0.1.36"
 
 [dev-dependencies]
 compiletest_rs = { version = "0.8.0", features = ["tmp", "rustc"] }
