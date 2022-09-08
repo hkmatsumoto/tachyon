@@ -225,9 +225,27 @@ impl<'tcx> FunctionCx<'tcx> {
 
                         LLVMBuildStore(self.llbx, tmp, *self.locals[place.local].llval());
                     }
+                    Rvalue::UnaryOp(un_op, operand) => {
+                        let operand = self.codegen_operand(operand).load_scalar(self.llbx);
+                        let llval = match un_op {
+                            mir::UnOp::Not => {
+                                LLVMBuildNot(self.llbx, *operand.llval(), name.as_ptr())
+                            }
+                            mir::UnOp::Neg => {
+                                if operand.ty().is_floating_point() {
+                                    LLVMBuildFNeg(self.llbx, *operand.llval(), name.as_ptr())
+                                } else {
+                                    LLVMBuildNeg(self.llbx, *operand.llval(), name.as_ptr())
+                                }
+                            }
+                        };
+
+                        LLVMBuildStore(self.llbx, llval, *self.locals[place.local].llval());
+                    }
                     _ => todo!(),
                 }
             }
+            StatementKind::StorageLive(_) | StatementKind::StorageDead(_) => {}
             _ => todo!(),
         }
     }
@@ -345,6 +363,9 @@ impl<'tcx> FunctionCx<'tcx> {
                 if let Some(target) = target {
                     LLVMBuildBr(self.llbx, self.basic_blocks[*target]);
                 }
+            }
+            TerminatorKind::Assert { target, .. } => {
+                LLVMBuildBr(self.llbx, self.basic_blocks[*target]);
             }
             _ => {
                 todo!()

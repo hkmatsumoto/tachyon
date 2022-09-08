@@ -1,0 +1,64 @@
+; ModuleID = 'top'
+source_filename = "top"
+
+define i32 @abs(i32 %n) {
+entry:
+  %_0 = alloca i32, align 4
+  %_2 = alloca i32, align 4
+  br label %bb0
+
+bb0:                                              ; preds = %entry
+  store i32 %n, i32* %_2, align 4
+  %0 = load i32, i32* %_2, align 4
+  %1 = call i32 @"core::num::<impl i32>::abs"(i32 %0)
+  store i32 %1, i32* %_0, align 4
+  br label %bb1
+
+bb1:                                              ; preds = %bb0
+  %2 = load i32, i32* %_0, align 4
+  ret i32 %2
+}
+
+define i32 @"core::num::<impl i32>::abs"(i32 %self) {
+entry:
+  %_0 = alloca i32, align 4
+  %_2 = alloca i1, align 1
+  %_3 = alloca i32, align 4
+  %_4 = alloca i32, align 4
+  %_5 = alloca i1, align 1
+  %_6 = alloca i32, align 4
+  br label %bb0
+
+bb0:                                              ; preds = %entry
+  store i32 %self, i32* %_3, align 4
+  %0 = load i32, i32* %_3, align 4
+  store i32 %0, i32* %_6, align 4
+  %1 = load i32, i32* %_6, align 4
+  %2 = icmp slt i32 %1, 0
+  store i1 %2, i1* %_2, align 1
+  %3 = load i1, i1* %_2, align 1
+  switch i1 %3, label %bb1 [
+    i1 false, label %bb3
+  ]
+
+bb1:                                              ; preds = %bb0
+  store i32 %self, i32* %_4, align 4
+  %4 = load i32, i32* %_4, align 4
+  %5 = icmp eq i32 %4, -2147483648
+  store i1 %5, i1* %_5, align 1
+  br label %bb2
+
+bb2:                                              ; preds = %bb1
+  %6 = load i32, i32* %_4, align 4
+  %7 = sub i32 0, %6
+  store i32 %7, i32* %_0, align 4
+  br label %bb4
+
+bb3:                                              ; preds = %bb0
+  store i32 %self, i32* %_0, align 4
+  br label %bb4
+
+bb4:                                              ; preds = %bb3, %bb2
+  %8 = load i32, i32* %_0, align 4
+  ret i32 %8
+}
